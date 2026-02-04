@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中文语用改写工具 | Pragmatic Rephraser</title>
+    <!-- 引入Tailwind CSS用于快速样式构建 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入Font Awesome用于图标 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- 配置Tailwind自定义主题 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        strong: '#E53E3E', // 强硬型-暗红（低饱和度）
+                        direct: '#DD6B20', // 直白型-暗橙（低饱和度）
+                        firm: '#D69E2E', // 坚定型-暗黄（低饱和度）
+                        appropriate: '#38A169', // 得体型-暗绿（低饱和度）
+                        friendly: '#3182CE', // 友好型-暗蓝（低饱和度）
+                        modest: '#805AD5', // 谦和型-暗紫（低饱和度）
+                        euphemistic: '#4A5568', // 委婉型-暗灰（低饱和度）
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .card-shadow {
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            }
+            .result-card {
+                transition: all 0.2s ease-in-out;
+            }
+            .result-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 24px rgba(22, 93, 255, 0.12);
+            }
+            .tab-active {
+                border-bottom: 2px solid #165DFF;
+                color: #165DFF;
+                font-weight: 600;
+            }
+            @keyframes fade-in-down {
+                from {
+                    opacity: 0;
+                    transform: translateY(-20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            @keyframes fade-out-up {
+                from {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+                to {
+                    opacity: 0;
+                    transform: translateY(-20px);
+                }
+            }
+            .animate-fade-in-down {
+                animation: fade-in-down 0.3s ease-out;
+            }
+            .animate-fade-out-up {
+                animation: fade-out-up 0.3s ease-out;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- 头部导航 -->
+    <header class="bg-white card-shadow sticky top-0 z-10">
+        <div class="container mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center">
+            <div class="flex items-center mb-4 md:mb-0">
+                <i class="fa-solid fa-comments text-primary text-2xl mr-3"></i>
+                <h1 class="text-xl md:text-2xl font-bold text-gray-800">中文语用改写工具</h1>
+                <span class="ml-2 text-sm text-gray-500 hidden md:inline-block">Pragmatic Rephraser</span>
+            </div>
+            <!-- 模式切换标签 -->
+            <div class="flex border-b border-gray-200">
+                <button id="normal-mode" class="tab-active px-6 py-2 cursor-pointer">普通模式</button>
+                <button id="professional-mode" class="px-6 py-2 cursor-pointer text-gray-600">专业模式</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主体内容 -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- 功能简介 -->
+        <section class="bg-white rounded-lg p-6 card-shadow mb-8">
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">工具简介</h2>
+            <p class="text-gray-600">
+                本工具基于语用学与礼貌理论，将中文句子改写为7种不同语用风格，帮助你在不同社交场景、人际关系中选择合适的表达策略，传递准确意图的同时维护良好沟通氛围。
+                <span class="text-primary font-medium">已内置DeepSeek API，可直接使用！</span>
+            </div>
+        </section>
+
+        <!-- 输入区域 -->
+        <section class="bg-white rounded-lg p-6 card-shadow mb-8">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">输入与参数设置</h2>
+            
+            <!-- 句子输入框 -->
+            <div class="mb-6">
+                <label for="input-sentence" class="block text-gray-700 mb-2">请输入中文句子（1-3句，每句≤50字）</label>
+                <textarea id="input-sentence" rows="3" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary resize-none" placeholder="请输入需要改写的句子..."></textarea>
+                <div class="flex flex-wrap gap-2 mt-2">
+                    <span class="text-xs bg-gray-100 px-3 py-1 rounded-full text-gray-600 cursor-pointer hover:bg-gray-200 transition" onclick="fillExample('把文件发我')">例句1：把文件发我</span>
+                    <span class="text-xs bg-gray-100 px-3 py-1 rounded-full text-gray-600 cursor-pointer hover:bg-gray-200 transition" onclick="fillExample('借我一支笔')">例句2：借我一支笔</span>
+                    <span class="text-xs bg-gray-100 px-3 py-1 rounded-full text-gray-600 cursor-pointer hover:bg-gray-200 transition" onclick="fillExample('参加明天的会议吗？')">例句3：参加明天的会议吗？</span>
+                    <span class="text-xs bg-gray-100 px-3 py-1 rounded-full text-gray-600 cursor-pointer hover:bg-gray-200 transition" onclick="fillExample('你这个方案有问题')">例句4：你这个方案有问题</span>
+                    <span class="text-xs bg-gray-100 px-3 py-1 rounded-full text-gray-600 cursor-pointer hover:bg-gray-200 transition" onclick="fillExample('能帮我看一下这个吗？')">例句5：能帮我看一下这个吗？</span>
+                </div>
+            </div>
+
+            <!-- 参数设置网格 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+                <!-- 社会关系 -->
+                <div>
+                    <label for="social-relation" class="block text-gray-700 mb-2 text-sm">社会关系</label>
+                    <select id="social-relation" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        <option value="亲属">亲属</option>
+                        <option value="伴侣">伴侣</option>
+                        <option value="朋友" selected>朋友</option>
+                        <option value="同学">同学</option>
+                        <option value="同事">同事</option>
+                        <option value="客户">客户</option>
+                        <option value="陌生人">陌生人</option>
+                        <option value="other">其他</option>
+                    </select>
+                    <input id="social-relation-other" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary mt-2 hidden" placeholder="请输入其他社会关系...">
+                </div>
+
+                <!-- 亲密程度 -->
+                <div>
+                    <label for="intimacy" class="block text-gray-700 mb-2 text-sm">亲密程度</label>
+                    <select id="intimacy" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        <option value="高">高</option>
+                        <option value="中" selected>中</option>
+                        <option value="低">低</option>
+                    </select>
+                </div>
+
+                <!-- 权力关系 -->
+                <div>
+                    <label for="power-relation" class="block text-gray-700 mb-2 text-sm">权力关系</label>
+                    <select id="power-relation" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        <option value="向上沟通">向上沟通</option>
+                        <option value="平级沟通" selected>平级沟通</option>
+                        <option value="向下沟通">向下沟通</option>
+                    </select>
+                </div>
+
+                <!-- 社交场合 -->
+                <div>
+                    <label for="social-scene" class="block text-gray-700 mb-2 text-sm">社交场合</label>
+                    <select id="social-scene" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        <option value="私人闲聊">私人闲聊</option>
+                        <option value="日常交流" selected>日常交流</option>
+                        <option value="校园沟通">校园沟通</option>
+                        <option value="职场沟通">职场沟通</option>
+                        <option value="商务洽谈">商务洽谈</option>
+                        <option value="正式公文">正式公文</option>
+                        <option value="other">其他</option>
+                    </select>
+                    <input id="social-scene-other" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary mt-2 hidden" placeholder="请输入其他社交场合...">
+                </div>
+
+                <!-- 语体类型 -->
+                <div>
+                    <label for="language-style" class="block text-gray-700 mb-2 text-sm">语体类型</label>
+                    <select id="language-style" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        <option value="口语" selected>口语</option>
+                        <option value="半书面语">半书面语</option>
+                        <option value="书面语">书面语</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 改写按钮 -->
+            <button id="rephrase-btn" class="w-full md:w-auto px-8 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition cursor-pointer flex items-center justify-center gap-2">
+                <i class="fa-solid fa-magic"></i>
+                <span>开始语用改写</span>
+            </button>
+
+            <!-- 使用提示 -->
+            <div class="mt-4 text-xs text-gray-500">
+                <p><i class="fa-solid fa-info-circle mr-1"></i> 点击按钮后，系统将直接调用DeepSeek AI API生成改写结果</p>
+            </div>
+        </section>
+
+        <!-- 输出区域 -->
+        <section id="output-section" class="bg-white rounded-lg p-6 card-shadow mb-8 hidden">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center justify-between">
+                <span>改写结果</span>
+                <button id="copy-all-results" class="text-sm text-primary hover:text-primary/80 cursor-pointer">
+                    <i class="fa-solid fa-copy mr-1"></i>复制全部
+                </button>
+            </h2>
+            <div id="result-container" class="grid grid-cols-1 gap-4">
+                <!-- 改写结果将通过JS动态插入 -->
+            </div>
+
+            <!-- 专业模式理论解释（默认隐藏） -->
+            <div id="professional-theory" class="mt-8 pt-6 border-t border-gray-200 hidden">
+                <h3 class="text-md font-semibold text-gray-800 mb-2">语用学理论支撑</h3>
+                <p class="text-gray-600 text-sm mb-2">1. 本改写工具基于面子理论，不同风格对应不同的面子维护策略，谦和型侧重满足对方积极面子，委婉型侧重保护对方消极面子。</p>
+                <p class="text-gray-600 text-sm mb-2">2. 得体型、友好型符合礼貌原则中的得体准则与一致准则，在传递核心意图的同时，最大限度减少对方的负面感受。</p>
+                <p class="text-gray-600 text-sm">3. 所有改写结果均遵循言语行为理论，保留原句的言外行为（核心意图），仅改变言内行为（表达形式）以适配不同场景。</p>
+            </div>
+        </section>
+
+        <!-- 历史记录区域 -->
+        <section id="history-section" class="bg-white rounded-lg p-6 card-shadow mb-8 hidden">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center justify-between">
+                <span>最近3条改写历史</span>
+                <button id="clear-history" class="text-sm text-primary hover:text-primary/80 cursor-pointer">
+                    <i class="fa-solid fa-trash mr-1"></i>清空历史
+                </button>
+            </h2>
+            <div id="history-container" class="grid grid-cols-1 gap-4">
+                <!-- 历史记录将通过JS动态插入 -->
+            </div>
+        </section>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-white border-t border-gray-200 py-6">
+        <div class="container mx-auto px-4 text-center text-gray-600 text-sm">
+            <p>中文语用改写工具 | 基于语用学与礼貌理论构建 | 计算语言学学习项目</p>
+        </div>
+    </footer>
+
+    <!-- Toast提示容器 -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50"></div>
+
+    <script>
+        // 全局变量
+        let rewriteHistory = JSON.parse(localStorage.getItem('pragmaticRewriterHistory')) || [];
+        const styleConfig = {
+            strong: {
+                label: '强硬型',
+                color: 'bg-strong/10 border-strong/30 text-strong',
+                borderColor: 'border-strong/30'
+            },
+            direct: {
+                label: '直白型',
+                color: 'bg-direct/10 border-direct/30 text-direct',
+                borderColor: 'border-direct/30'
+            },
+            firm: {
+                label: '坚定型',
+                color: 'bg-firm/10 border-firm/30 text-firm',
+                borderColor: 'border-firm/30'
+            },
+            appropriate: {
+                label: '得体型',
+                color: 'bg-appropriate/10 border-appropriate/30 text-appropriate',
+                borderColor: 'border-appropriate/30'
+            },
+            friendly: {
+                label: '友好型',
+                color: 'bg-friendly/10 border-friendly/30 text-friendly',
+                borderColor: 'border-friendly/30'
+            },
+            modest: {
+                label: '谦和型',
+                color: 'bg-modest/10 border-modest/30 text-modest',
+                borderColor: 'border-modest/30'
+            },
+            euphemistic: {
+                label: '委婉型',
+                color: 'bg-euphemistic/10 border-euphemistic/30 text-euphemistic',
+                borderColor: 'border-euphemistic/30'
+            }
+        };
+
+        // ==================== 请在此处输入您的DeepSeek API密钥 ====================
+        // 将下面的 "your_deepseek_api_key_here" 替换为您实际的API密钥
+        const DEEPSEEK_API_KEY = "sk-9e233ca345434a77a2f1ac193a6a87ae"; // 
+        // ==================== 请在此处输入您的DeepSeek API密钥 ====================
+
+        // DeepSeek API配置
+        const DEEPSEEK_API_CONFIG = {
+            BASE_URL: 'https://api.deepseek.com/v1/chat/completions',
+            MODEL: 'deepseek-chat',
+            DEFAULT_TEMPERATURE: 0.7,
+            DEFAULT_MAX_TOKENS: 1500,
+            TIMEOUT: 30000 // 30秒超时
+        };
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 检查API密钥是否已设置
+            if (!DEEPSEEK_API_KEY || DEEPSEEK_API_KEY === "your_deepseek_api_key_here") {
+                showToast('警告：请先在代码中设置您的DeepSeek API密钥！', 'warning');
+                console.error('错误：未设置有效的DeepSeek API密钥');
+                document.getElementById('rephrase-btn').disabled = true;
+                document.getElementById('rephrase-btn').innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i><span>未配置API密钥</span>';
+            }
+
+            // 社会关系/社交场合 "其他" 选项切换输入框
+            initOtherInput('social-relation', 'social-relation-other');
+            initOtherInput('social-scene', 'social-scene-other');
+
+            // 模式切换
+            initModeSwitch();
+
+            // 改写按钮点击事件
+            document.getElementById('rephrase-btn').addEventListener('click', handleRephrase);
+
+            // 清空历史记录按钮事件
+            document.getElementById('clear-history').addEventListener('click', clearHistory);
+            
+            // 复制全部结果按钮事件
+            document.getElementById('copy-all-results').addEventListener('click', copyAllResults);
+
+            // 加载历史记录
+            renderHistory();
+        });
+
+        // 初始化"其他"选项的输入框切换
+        function initOtherInput(selectId, inputId) {
+            const select = document.getElementById(selectId);
+            const input = document.getElementById(inputId);
+
+            select.addEventListener('change', function() {
+                if (this.value === 'other') {
+                    input.classList.remove('hidden');
+                } else {
+                    input.classList.add('hidden');
+                    input.value = '';
+                }
+            });
+        }
+
+        // 初始化模式切换
+        function initModeSwitch() {
+            const normalMode = document.getElementById('normal-mode');
+            const professionalMode = document.getElementById('professional-mode');
+            const theorySection = document.getElementById('professional-theory');
+
+            normalMode.addEventListener('click', function() {
+                normalMode.classList.add('tab-active');
+                professionalMode.classList.remove('tab-active');
+                theorySection.classList.add('hidden');
+            });
+
+            professionalMode.addEventListener('click', function() {
+                professionalMode.classList.add('tab-active');
+                normalMode.classList.remove('tab-active');
+                theorySection.classList.remove('hidden');
+            });
+        }
+
+        // 填充例句
+        function fillExample(sentence) {
+            document.getElementById('input-sentence').value = sentence;
+        }
+
+        // 处理改写逻辑 - 主函数
+        async function handleRephrase() {
+            const inputSentence = document.getElementById('input-sentence').value.trim();
+            if (!inputSentence) {
+                showToast('请先输入需要改写的中文句子！', 'warning');
+                return;
+            }
+
+            // 检查API密钥
+            if (!DEEPSEEK_API_KEY || DEEPSEEK_API_KEY === "your_deepseek_api_key_here") {
+                showToast('错误：未配置有效的DeepSeek API密钥', 'error');
+                return;
+            }
+
+            // 显示加载状态
+            showLoading(true);
+
+            // 获取参数配置
+            const params = getParams();
+
+            try {
+                // 调用DeepSeek API
+                const rephraseResults = await callDeepSeekApi(inputSentence, params);
+                
+                // 渲染改写结果
+                renderResults(rephraseResults);
+                
+                // 保存到历史记录
+                saveToHistory(inputSentence, params, rephraseResults);
+                
+                // 显示输出区域和历史记录区域
+                document.getElementById('output-section').classList.remove('hidden');
+                document.getElementById('history-section').classList.remove('hidden');
+                
+                // 滚动到结果区域
+                document.getElementById('output-section').scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'start' 
+                });
+                
+                showToast('改写完成！', 'success');
+                
+            } catch (error) {
+                console.error('DeepSeek API调用失败:', error);
+                
+                // 友好的错误提示
+                let errorMessage = 'AI改写失败，请稍后重试';
+                if (error.message.includes('API密钥无效') || error.message.includes('401')) {
+                    errorMessage = 'API密钥无效，请检查代码中的API密钥配置';
+                } else if (error.message.includes('超时')) {
+                    errorMessage = '请求超时，请检查网络连接后重试';
+                } else if (error.message.includes('网络') || error.message.includes('Failed to fetch')) {
+                    errorMessage = '网络连接失败，请检查网络设置';
+                } else if (error.message.includes('余额') || error.message.includes('额度')) {
+                    errorMessage = 'API额度不足，请检查账户余额';
+                }
+                
+                showToast(`错误：${errorMessage}`, 'error');
+                
+                // 如果API调用失败，可以尝试使用模拟数据作为备选
+                const useMock = confirm(`${errorMessage}\n\n是否使用模拟数据继续演示？`);
+                if (useMock) {
+                    const mockResults = generateMockResults(inputSentence, params);
+                    renderResults(mockResults);
+                    saveToHistory(inputSentence, params, mockResults);
+                    document.getElementById('output-section').classList.remove('hidden');
+                    document.getElementById('history-section').classList.remove('hidden');
+                }
+                
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 获取参数配置
+        function getParams() {
+            const socialRelation = document.getElementById('social-relation').value === 'other' 
+                ? document.getElementById('social-relation-other').value.trim() || '其他'
+                : document.getElementById('social-relation').value;
+
+            const socialScene = document.getElementById('social-scene').value === 'other'
+                ? document.getElementById('social-scene-other').value.trim() || '其他'
+                : document.getElementById('social-scene').value;
+
+            return {
+                socialRelation: socialRelation,
+                intimacy: document.getElementById('intimacy').value,
+                powerRelation: document.getElementById('power-relation').value,
+                socialScene: socialScene,
+                languageStyle: document.getElementById('language-style').value
+            };
+        }
+
+        // 调用DeepSeek API的核心函数
+        async function callDeepSeekApi(sentence, params) {
+            // 检查API密钥
+            if (!DEEPSEEK_API_KEY || DEEPSEEK_API_KEY === "your_deepseek_api_key_here") {
+                throw new Error('API密钥未配置，请在代码中设置有效的DeepSeek API密钥');
+            }
+
+            // 构建系统提示词
+            const systemPrompt = `你是一个专业的中文语用学改写助手，能够根据社会关系、权力关系、亲密程度、社交场合、谈论内容、语体类型这些因素，将句子改写成多个核心意图相同但表达方式不同的版本。
+
+请严格按照以下JSON格式返回数据，包含7种表达方式：
+{
+  "results": [
+    {
+      "type": "strong",
+      "sentence": "改写后的句子内容",
+      "comment": "语言特征和适用场景说明，50字以内"
+    },
+    {
+      "type": "direct",
+      "sentence": "改写后的句子内容",
+      "comment": "语言特征和适用场景说明，50字以内"
+    },
+    {
+      "type": "firm",
+      "sentence": "改写后的句子内容",
+      "comment": "语言特征和适用场景说明，50字以内"
+    },
+    {
+      "type": "appropriate",
+      "sentence": "改写后的句子内容",
+      "comment": "语言特征和适用场景说明，50字以内"
+    },
+    {
+      "type": "friendly",
+      "sentence": "改写后的句子内容",
+      "comment": "语言特征和适用场景说明，50字以内"
+    },
+    {
+      "type": "modest",
+      "sentence": "改写后的句子内容",
+      "comment": "语言特征和适用场景说明，50字以内"
+    },
+    {
+      "type": "euphemistic",
+      "sentence": "改写后的句子内容",
+      "comment": "语言特征和适用场景说明，50字以内"
+    }
+  ]
+}
+
+请确保：
+1. 每个类型的sentence字段都是完整的中文句子
+2. comment字段简要说明该表达方式的主要适用场景和语言特征
+3. 所有句子保持原句的核心意图不变`;
+
+            // 构建用户提示词
+            const userPrompt = `请根据以下语境参数改写句子：
+- 原句："${sentence}"
+- 社会关系：${params.socialRelation}
+- 亲密程度：${params.intimacy}
+- 权力关系：${params.powerRelation}
+- 社交场合：${params.socialScene}
+- 语体类型：${params.languageStyle}
+
+请生成7种不同风格的表达方式，要求如下：
+1. 强硬型 (strong)：语气强硬直接，无礼貌用语，直接传递指令
+2. 直白型 (direct)：简洁明了，无多余修饰，不包含礼貌用语
+3. 坚定型 (firm)：立场明确，逻辑清晰，少量或不使用礼貌用语
+4. 得体型 (appropriate)：礼貌适中，包含基础礼貌用语，表达自然得体
+5. 友好型 (friendly)：语气亲和，带有维护人际关系的意味
+6. 谦和型 (modest)：使用谦语、敬语，态度谦和恭敬，高度尊重对方
+7. 委婉型 (euphemistic)：间接表达，留有余地，不直接强加意图给对方
+
+请严格按照指定的JSON格式返回结果。`;
+
+            // 创建AbortController用于超时控制
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), DEEPSEEK_API_CONFIG.TIMEOUT);
+
+            try {
+                const response = await fetch(DEEPSEEK_API_CONFIG.BASE_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: DEEPSEEK_API_CONFIG.MODEL,
+                        messages: [
+                            {
+                                role: 'system',
+                                content: systemPrompt
+                            },
+                            {
+                                role: 'user',
+                                content: userPrompt
+                            }
+                        ],
+                        temperature: DEEPSEEK_API_CONFIG.DEFAULT_TEMPERATURE,
+                        max_tokens: DEEPSEEK_API_CONFIG.DEFAULT_MAX_TOKENS,
+                        response_format: { type: "json_object" } // 要求返回JSON格式
+                    }),
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    let errorMessage = `API调用失败: ${response.status}`;
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.error?.message || errorMessage;
+                        
+                        // 针对常见错误提供更友好的提示
+                        if (response.status === 401) {
+                            errorMessage = 'API密钥无效，请检查代码中的API密钥配置';
+                        } else if (response.status === 429) {
+                            errorMessage = '请求过于频繁，请稍后再试';
+                        } else if (response.status >= 500) {
+                            errorMessage = 'DeepSeek服务器错误，请稍后重试';
+                        }
+                    } catch (e) {
+                        // 忽略JSON解析错误
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                const data = await response.json();
+                
+                // 解析API返回的内容
+                const content = data.choices?.[0]?.message?.content;
+                if (!content) {
+                    throw new Error('API返回内容为空');
+                }
+                
+                // 尝试解析JSON
+                let parsedResult;
+                try {
+                    parsedResult = JSON.parse(content);
+                } catch (e) {
+                    console.error('API返回内容解析失败:', content);
+                    throw new Error('API返回格式不正确，无法解析JSON');
+                }
+                
+                // 验证结果结构
+                if (!parsedResult.results || !Array.isArray(parsedResult.results)) {
+                    throw new Error('API返回数据格式错误，缺少results数组');
+                }
+                
+                // 确保有7种结果，如果少于7种则补充
+                if (parsedResult.results.length < 7) {
+                    console.warn(`API返回结果只有${parsedResult.results.length}种，少于7种`);
+                    // 可以使用模拟数据补充缺失的类型
+                }
+                
+                return parsedResult.results;
+                
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    throw new Error('请求超时，请稍后重试');
+                }
+                
+                if (error.message.includes('Failed to fetch')) {
+                    throw new Error('网络连接失败，请检查网络设置');
+                }
+                
+                throw error;
+            }
+        }
+
+        // 生成模拟结果（当API不可用时使用）
+        function generateMockResults(input, params) {
+            // 根据句子类型生成不同的模拟结果
+            let results = [];
+            
+            // 判断句子类型
+            const isRequest = input.includes('发我') || input.includes('借我') || input.includes('帮我') || input.includes('给');
+            const isQuestion = input.includes('吗？') || input.includes('?');
+            const isCommand = input.includes('把') || input.includes('需要') || input.includes('要');
+            
+            // 生成7种风格的改写
+            const styles = ['strong', 'direct', 'firm', 'appropriate', 'friendly', 'modest', 'euphemistic'];
+            
+            styles.forEach(style => {
+                let sentence = input;
+                let comment = '';
+                
+                switch(style) {
+                    case 'strong':
+                        if (isRequest) sentence = `${input}，马上！`;
+                        else if (isQuestion) sentence = `${input.replace('吗', '')}，必须参加！`;
+                        else if (isCommand) sentence = `${input}，立刻执行！`;
+                        comment = '语言特征：语气强硬，无礼貌用语，直接传递指令。适用场景：表达不满、彰显权威，或在紧急情况下对下属/亲密且无需顾忌的对象使用。';
+                        break;
+                        
+                    case 'direct':
+                        comment = '语言特征：直白简洁，无额外修饰，不包含礼貌用语。适用场景：与亲密程度高的亲属、伴侣、好友交流，无需客套，追求沟通效率。';
+                        break;
+                        
+                    case 'firm':
+                        if (isRequest) sentence = `我需要${input.replace('发我', '那份文件')}，请尽快处理。`;
+                        else if (isQuestion) sentence = `${input.replace('吗', '')}，建议你参加。`;
+                        comment = '语言特征：立场明确，逻辑清晰，少量或不使用礼貌用语，不冒犯他人。适用场景：职场对接、紧急事务处理，平级或向下沟通时追求高效执行。';
+                        break;
+                        
+                    case 'appropriate':
+                        if (isRequest) sentence = `${input}，谢谢。`;
+                        else if (isQuestion) sentence = `请问${input}`;
+                        comment = '语言特征：礼貌适中，包含基础礼貌用语，表达自然得体。适用场景：大多数日常交流、校园沟通、普通职场场景，是通用性最强的表达风格。';
+                        break;
+                        
+                    case 'friendly':
+                        if (isRequest) sentence = `嘿，方便${input}吗？`;
+                        else if (isQuestion) sentence = `亲爱的，${input}`;
+                        comment = '语言特征：语气亲和，带有维护人际关系的意味，可能包含轻微赞美或关切。适用场景：与朋友、同学、关系较好的同事交流，用于巩固良好关系。';
+                        break;
+                        
+                    case 'modest':
+                        if (isRequest) sentence = `麻烦您${input}，辛苦了。`;
+                        else if (isQuestion) sentence = `如果您能${input.replace('吗', '')}，我们将不胜感激。`;
+                        comment = '语言特征：大量使用谦语、敬语，态度谦和恭敬，高度尊重对方。适用场景：正式场合、商务洽谈、向上沟通（对上级/客户），体现专业与礼貌。';
+                        break;
+                        
+                    case 'euphemistic':
+                        if (isRequest) sentence = `我这边需要${input.replace('发我', '那份文件')}，不知道您是否方便？`;
+                        else if (isQuestion) sentence = `关于${input.replace('吗', '')}，想确认下您的时间安排。`;
+                        comment = '语言特征：间接表达，留有余地，不直接强加意图给对方。适用场景：与陌生人、关系较浅的对象交流，或需要拒绝、提意见的场景，避免尴尬。';
+                        break;
+                }
+                
+                results.push({
+                    type: style,
+                    sentence: sentence,
+                    comment: comment
+                });
+            });
+            
+            return results;
+        }
+
+        // 渲染改写结果
+        function renderResults(results) {
+            const container = document.getElementById('result-container');
+            container.innerHTML = '';
+            
+            if (!results || results.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fa-solid fa-exclamation-triangle text-2xl mb-2"></i>
+                        <p>未获取到改写结果</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // 按照预定的顺序显示
+            const typeOrder = ['strong', 'direct', 'firm', 'appropriate', 'friendly', 'modest', 'euphemistic'];
+            
+            typeOrder.forEach(typeKey => {
+                const result = results.find(r => r.type === typeKey);
+                if (!result || !styleConfig[typeKey]) {
+                    // 如果某种类型的结果缺失，创建一个占位符
+                    const card = document.createElement('div');
+                    card.className = `result-card rounded-lg border ${styleConfig[typeKey]?.color || 'bg-gray-100 border-gray-300'} p-4 opacity-70`;
+                    card.innerHTML = `
+                        <div class="flex items-center mb-2">
+                            <span class="font-semibold mr-2">${styleConfig[typeKey]?.label || typeKey}</span>
+                            <span class="text-xs bg-white/60 rounded px-2 py-0.5">${typeKey}</span>
+                        </div>
+                        <p class="text-gray-500 mb-3 italic">该类型改写结果缺失</p>
+                    `;
+                    container.appendChild(card);
+                    return;
+                }
+                
+                const card = document.createElement('div');
+                card.className = `result-card rounded-lg border ${styleConfig[typeKey].color} p-4`;
+                card.innerHTML = `
+                    <div class="flex items-center mb-2">
+                        <span class="font-semibold mr-2">${styleConfig[typeKey].label}</span>
+                        <span class="text-xs bg-white/60 rounded px-2 py-0.5">${result.type}</span>
+                    </div>
+                    <p class="text-gray-800 mb-3">${result.sentence}</p>
+                    <p class="text-xs text-gray-600">${result.comment}</p>
+                    <div class="mt-3 flex justify-end">
+                        <button onclick="copyToClipboard('${result.sentence.replace(/'/g, "\\'")}')" 
+                                class="text-xs text-gray-500 hover:text-primary cursor-pointer">
+                            <i class="fa-solid fa-copy mr-1"></i>复制
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // 保存到历史记录
+        function saveToHistory(input, params, results) {
+            const historyItem = {
+                id: Date.now(),
+                input: input,
+                params: params,
+                results: results,
+                time: new Date().toLocaleString()
+            };
+
+            // 保持最多3条历史记录
+            rewriteHistory.unshift(historyItem);
+            if (rewriteHistory.length > 3) {
+                rewriteHistory = rewriteHistory.slice(0, 3);
+            }
+
+            // 保存到本地存储
+            localStorage.setItem('pragmaticRewriterHistory', JSON.stringify(rewriteHistory));
+
+            // 重新渲染历史记录
+            renderHistory();
+        }
+
+        // 渲染历史记录
+        function renderHistory() {
+            const container = document.getElementById('history-container');
+            container.innerHTML = '';
+
+            if (rewriteHistory.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-4">暂无改写历史记录</p>';
+                return;
+            }
+
+            rewriteHistory.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'rounded-lg border border-gray-200 p-4 hover:border-primary/30 transition';
+                card.innerHTML = `
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-sm font-medium text-gray-800">输入：${item.input}</span>
+                        <span class="text-xs text-gray-500">${item.time}</span>
+                    </div>
+                    <div class="text-xs text-gray-600 mb-3">
+                        <span>关系：${item.params.socialRelation} | 亲密程度：${item.params.intimacy} | 场景：${item.params.socialScene}</span>
+                    </div>
+                    <button class="text-sm text-primary hover:text-primary/80 cursor-pointer" onclick="replayHistory(${item.id})">
+                        <i class="fa-solid fa-repeat mr-1"></i>重新查看改写结果
+                    </button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // 回放历史记录
+        function replayHistory(id) {
+            const item = rewriteHistory.find(item => item.id === id);
+            if (!item) return;
+
+            // 填充输入框和参数
+            document.getElementById('input-sentence').value = item.input;
+            setParamValue('social-relation', item.params.socialRelation);
+            setParamValue('intimacy', item.params.intimacy);
+            setParamValue('power-relation', item.params.powerRelation);
+            setParamValue('social-scene', item.params.socialScene);
+            setParamValue('language-style', item.params.languageStyle);
+
+            // 渲染结果
+            renderResults(item.results);
+
+            // 显示输出区域
+            document.getElementById('output-section').classList.remove('hidden');
+
+            // 滚动到输出区域
+            document.getElementById('output-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // 设置参数值
+        function setParamValue(selectId, value) {
+            const select = document.getElementById(selectId);
+            const otherInput = document.getElementById(`${selectId}-other`);
+
+            // 先检查是否有匹配选项
+            let hasMatch = false;
+            for (let option of select.options) {
+                if (option.value === value) {
+                    select.value = value;
+                    hasMatch = true;
+                    otherInput.classList.add('hidden');
+                    otherInput.value = '';
+                    break;
+                }
+            }
+
+            // 无匹配则选"其他"并填充输入框
+            if (!hasMatch) {
+                select.value = 'other';
+                otherInput.classList.remove('hidden');
+                otherInput.value = value;
+            }
+        }
+
+        // 清空历史记录
+        function clearHistory() {
+            if (confirm('确定要清空所有改写历史记录吗？记录清空后无法恢复。')) {
+                rewriteHistory = [];
+                localStorage.removeItem('pragmaticRewriterHistory');
+                renderHistory();
+                showToast('历史记录已清空', 'success');
+            }
+        }
+
+        // 显示/隐藏加载状态
+        function showLoading(isLoading) {
+            const button = document.getElementById('rephrase-btn');
+            const buttonText = button.querySelector('span');
+            
+            if (isLoading) {
+                button.disabled = true;
+                buttonText.textContent = 'AI处理中...';
+                button.classList.add('opacity-75', 'cursor-not-allowed');
+                
+                // 添加旋转图标
+                const icon = button.querySelector('i');
+                if (icon) {
+                    icon.className = 'fa-solid fa-spinner fa-spin';
+                }
+            } else {
+                button.disabled = false;
+                buttonText.textContent = '开始语用改写';
+                button.classList.remove('opacity-75', 'cursor-not-allowed');
+                
+                // 恢复原图标
+                const icon = button.querySelector('i');
+                if (icon) {
+                    icon.className = 'fa-solid fa-magic';
+                }
+            }
+        }
+
+        // 显示提示消息
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            
+            // 创建toast元素
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-green-500' : 
+                           type === 'warning' ? 'bg-yellow-500' : 
+                           type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+            
+            toast.className = `${bgColor} text-white px-4 py-2 rounded-lg shadow-lg mb-2 animate-fade-in-down`;
+            toast.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fa-solid ${type === 'success' ? 'fa-check-circle' : 
+                                      type === 'warning' ? 'fa-exclamation-triangle' : 
+                                      type === 'error' ? 'fa-times-circle' : 'fa-info-circle'} mr-2"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            container.appendChild(toast);
+            
+            // 3秒后自动移除
+            setTimeout(() => {
+                toast.classList.add('animate-fade-out-up');
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        // 复制到剪贴板
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('已复制到剪贴板', 'success');
+            }).catch(err => {
+                console.error('复制失败:', err);
+                showToast('复制失败，请手动复制', 'warning');
+            });
+        }
+
+        // 复制全部结果
+        function copyAllResults() {
+            const container = document.getElementById('result-container');
+            const cards = container.querySelectorAll('.result-card');
+            
+            let allText = '语用学改写结果：\n\n';
+            
+            cards.forEach(card => {
+                const type = card.querySelector('.font-semibold')?.textContent || '';
+                const sentence = card.querySelector('.text-gray-800')?.textContent || '';
+                const comment = card.querySelector('.text-xs.text-gray-600')?.textContent || '';
+                
+                if (sentence && sentence !== '该类型改写结果缺失') {
+                    allText += `${type}：${sentence}\n说明：${comment}\n\n`;
+                }
+            });
+            
+            if (allText.trim() === '语用学改写结果：') {
+                showToast('没有可复制的内容', 'warning');
+                return;
+            }
+            
+            copyToClipboard(allText);
+        }
+    </script>
+</body>
+</html>
